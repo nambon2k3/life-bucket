@@ -1,0 +1,9 @@
+[project]
+name = "habbit-tracking"
+version = "0.1.0"
+description = "Life Buckets habit tracking API"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
