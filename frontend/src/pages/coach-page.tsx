@@ -41,7 +41,7 @@ export function CoachPage() {
       })
       setTurns([...history, { role: "assistant", content: response.reply, toolTrace: response.tool_trace }])
     } catch (caught) {
-      const message = caught instanceof Error ? caught.message : "The coach is unavailable"
+      const message = caught instanceof Error ? caught.message : "The assistant is unavailable"
       toast.error(message)
       setTurns([...history, { role: "assistant", content: message }])
     } finally {
@@ -52,7 +52,7 @@ export function CoachPage() {
   return (
     <div>
       <SectionHeader
-        title="AI Coach"
+        title="Assistant"
         description="LangGraph calls a local Ollama model. Tool chips under a reply are the functions the graph actually ran."
       />
       <div className="mb-3 flex flex-wrap gap-2">
@@ -65,7 +65,7 @@ export function CoachPage() {
       <div className="space-y-3 rounded-xl border bg-card p-4">
         {turns.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Ask about today, or tell the coach to check in a habit. The model needs to be running on this machine.
+            Ask about today, or tell the assistant to check in a habit. The model needs to be running on this machine.
           </p>
         ) : null}
         {turns.map((turn, index) => (
@@ -102,7 +102,7 @@ export function CoachPage() {
         <Textarea
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
-          placeholder="Ask the coach"
+          placeholder="Ask the assistant"
           rows={2}
         />
         <Button type="submit" disabled={sending || !draft.trim()}>

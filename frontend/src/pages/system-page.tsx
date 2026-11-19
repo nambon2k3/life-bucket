@@ -83,7 +83,7 @@ export function SystemPage() {
         </div>
         {health.data ? (
           <p className="mt-3 text-xs text-muted-foreground">
-            Coach model {health.data.ollama_model} at {health.data.ollama_base_url}
+            Assistant model {health.data.ollama_model} at {health.data.ollama_base_url}
           </p>
         ) : null}
       </section>

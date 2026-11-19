@@ -1,6 +1,6 @@
 # Life Buckets
 
-Habit tracking xếp theo khu vực cuộc sống: life buckets, projects, task inbox, và một coach chạy model local.
+Habit tracking xếp theo khu vực cuộc sống: life buckets, projects, task inbox, và một assistant chạy model local.
 
 Bố cục giao diện bám theo board Life Buckets (buckets → projects → inbox). Backend tách riêng để học đúng việc của từng thành phần, không nhét tất cả vào một process.
 
@@ -35,11 +35,11 @@ Dashboard:
 2. Request sau, trong 30 giây, trả JSON từ Redis và bật cờ `cached: true`.
 3. Mọi lần ghi (check-in, task, project) xóa key đó.
 
-Coach:
+Assistant:
 
 1. `POST /api/v1/agent/chat` chạy một graph LangGraph: `agent → tools → agent`.
 2. Model là Ollama trên máy host (`qwen2.5:7b` mặc định). Model cần hỗ trợ tool calling (`qwen2.5`, `llama3.1`).
-3. Tool ghi dữ liệu gọi cùng service với HTTP API, nên coach check-in một habit giống hệt nút trên UI.
+3. Tool ghi dữ liệu gọi cùng service với HTTP API, nên assistant check-in một habit giống hệt nút trên UI.
 4. Job weekly review dùng cùng graph nhưng tắt tool ghi.
 
 ## Cây thư mục
@@ -72,7 +72,7 @@ API không serve file React. Vite chạy riêng và proxy `/api` sang cổng 800
 
 ## Chạy
 
-Cần Docker, Node 20+, và [Ollama](https://ollama.com) nếu muốn nói chuyện với coach.
+Cần Docker, Node 20+, và [Ollama](https://ollama.com) nếu muốn nói chuyện với assistant.
 
 ```bash
 ollama pull qwen2.5:7b
@@ -123,7 +123,7 @@ celery -A app.workers.celery_app worker -Q celery,habits,reminders,agent --logle
 - **Habits** — check-in hôm nay, streak, thêm habit.
 - **Projects** — planned / in progress / completed.
 - **Task Inbox** — Today, This week, Pending, Overdue, Completed.
-- **AI Coach** — chat với graph. Chip dưới câu trả lời là tool LangGraph đã gọi.
+- **Assistant** — chat với graph. Chip dưới câu trả lời là tool LangGraph đã gọi.
 - **System** — sức khỏe Postgres / Redis / RabbitMQ, enqueue 3 job, poll trạng thái, activity feed.
 
 Beat đang đặt lịch theo `Asia/Ho_Chi_Minh`: tính lại streak 6:50, reminder 7:00, weekly review thứ Hai 8:00. Trang System enqueue cùng task đó ngay, không cần đợi lịch.

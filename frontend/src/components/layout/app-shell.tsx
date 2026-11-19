@@ -9,7 +9,7 @@ const links = [
   { to: "/projects", label: "Projects", icon: FolderKanban, end: false },
   { to: "/inbox", label: "Task Inbox", icon: Inbox, end: false },
   { to: "/journal", label: "Journal", icon: BookOpen, end: false },
-  { to: "/coach", label: "AI Coach", icon: Sparkles, end: false },
+  { to: "/coach", label: "Assistant", icon: Sparkles, end: false },
   { to: "/system", label: "System", icon: Server, end: false },
 ]
 

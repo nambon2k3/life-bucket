@@ -34,32 +34,60 @@ function entryDate(iso: string): string {
   })
 }
 
-function EntryCard({ event }: { event: JournalEvent }) {
+function clock(value: string | null): string {
+  if (!value) return ""
+  return value.slice(0, 5)
+}
+
+type DayGroup = {
+  entryOn: string
+  events: JournalEvent[]
+}
+
+function groupDays(events: JournalEvent[]): DayGroup[] {
+  const order: string[] = []
+  const byDay = new Map<string, JournalEvent[]>()
+  for (const event of events) {
+    const list = byDay.get(event.entry_on)
+    if (list) list.push(event)
+    else {
+      byDay.set(event.entry_on, [event])
+      order.push(event.entry_on)
+    }
+  }
+  return order.map((entryOn) => ({ entryOn, events: byDay.get(entryOn) ?? [] }))
+}
+
+function DayCard({ day }: { day: DayGroup }) {
+  const preview = day.events.slice(0, 4)
+  const extra = day.events.length - preview.length
   return (
     <Link
-      to={`/journal/${event.entry_on}`}
+      to={`/journal/${day.entryOn}`}
       className="mb-3 block cursor-pointer break-inside-avoid rounded-xl border bg-card px-4 py-3.5 transition-colors hover:bg-muted/50"
     >
-      <p className="font-medium leading-snug">{event.title}</p>
-      {event.note ? <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{event.note}</p> : null}
-      <div className="mt-4 flex items-end justify-between gap-3">
-        <p className="text-xs text-muted-foreground">{entryDate(event.entry_on)}</p>
-        {event.tag ? (
-          <span className="rounded-md border px-1.5 py-0.5 text-xs text-foreground/80">{event.tag}</span>
-        ) : null}
-      </div>
+      <p className="font-medium leading-snug">{entryDate(day.entryOn)}</p>
+      <ul className="mt-3 space-y-1.5">
+        {preview.map((event) => (
+          <li key={event.id} className="flex gap-3 text-sm">
+            <span className="w-10 shrink-0 tabular-nums text-muted-foreground">{clock(event.at_time) || "—"}</span>
+            <span className="min-w-0">{event.title}</span>
+          </li>
+        ))}
+      </ul>
+      {extra > 0 ? <p className="mt-2 text-xs text-muted-foreground">+{extra} more</p> : null}
     </Link>
   )
 }
 
-function CardGrid({ events }: { events: JournalEvent[] }) {
-  if (events.length === 0) {
+function CardGrid({ days }: { days: DayGroup[] }) {
+  if (days.length === 0) {
     return <p className="text-sm text-muted-foreground">Nothing recorded yet.</p>
   }
   return (
     <div className="columns-1 gap-3 sm:columns-2 xl:columns-3">
-      {events.map((event) => (
-        <EntryCard key={event.id} event={event} />
+      {days.map((day) => (
+        <DayCard key={day.entryOn} day={day} />
       ))}
     </div>
   )
@@ -79,7 +107,6 @@ export function JournalPage() {
   const [atTime, setAtTime] = useState("")
   const [title, setTitle] = useState("")
   const [note, setNote] = useState("")
-  const [draftTag, setDraftTag] = useState("")
   const [saving, setSaving] = useState(false)
 
   const tags = useMemo(() => {
@@ -90,36 +117,44 @@ export function JournalPage() {
     return [...names].sort((left, right) => left.localeCompare(right))
   }, [journal.data])
 
-  const visible = useMemo(() => {
-    const needle = query.trim().toLowerCase()
-    return (journal.data ?? []).filter((event) => {
-      if (tag !== "all" && event.tag !== tag) return false
-      if (!needle) return true
-      return `${event.title} ${event.note} ${event.tag}`.toLowerCase().includes(needle)
-    })
-  }, [journal.data, query, tag])
+  const days = useMemo(() => groupDays(journal.data ?? []), [journal.data])
 
-  const monthEvents = useMemo(() => {
+  const visibleDays = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    return days.filter((day) =>
+      day.events.some((event) => {
+        if (tag !== "all" && event.tag !== tag) return false
+        if (!needle) return true
+        return `${event.title} ${event.note} ${event.tag}`.toLowerCase().includes(needle)
+      }),
+    )
+  }, [days, query, tag])
+
+  const monthDays = useMemo(() => {
     const prefix = isoOf(cursor.year, cursor.month, 1).slice(0, 7)
-    return visible.filter((event) => event.entry_on.startsWith(prefix))
-  }, [cursor, visible])
+    return visibleDays.filter((day) => day.entryOn.startsWith(prefix))
+  }, [cursor, visibleDays])
 
   const groups = useMemo(() => {
-    const buckets = new Map<string, JournalEvent[]>()
-    for (const event of visible) {
-      const key = event.tag || "Untagged"
-      const list = buckets.get(key) ?? []
-      list.push(event)
-      buckets.set(key, list)
+    const buckets = new Map<string, DayGroup[]>()
+    for (const day of visibleDays) {
+      const names = [...new Set(day.events.map((event) => event.tag || "Untagged"))].filter(
+        (name) => tag === "all" || name === tag,
+      )
+      for (const name of names) {
+        const list = buckets.get(name) ?? []
+        list.push(day)
+        buckets.set(name, list)
+      }
     }
     return [...buckets.entries()].sort(([left], [right]) => {
       if (left === "Untagged") return 1
       if (right === "Untagged") return -1
       return left.localeCompare(right)
     })
-  }, [visible])
+  }, [tag, visibleDays])
 
-  const marked = useMemo(() => new Set(monthEvents.map((event) => event.entry_on)), [monthEvents])
+  const marked = useMemo(() => new Set(monthDays.map((day) => day.entryOn)), [monthDays])
   const firstWeekday = (new Date(cursor.year, cursor.month, 1).getDay() + 6) % 7
   const daysInMonth = new Date(cursor.year, cursor.month + 1, 0).getDate()
   const cells: Array<number | null> = [
@@ -147,13 +182,11 @@ export function JournalPage() {
           at_time: atTime || null,
           title,
           note,
-          tag: draftTag,
         }),
       })
       setTitle("")
       setNote("")
       setAtTime("")
-      setDraftTag("")
       setOpen(false)
       await journal.reload()
     } catch (caught) {
@@ -258,16 +291,16 @@ export function JournalPage() {
           <p className="text-sm text-muted-foreground">Nothing recorded yet.</p>
         ) : (
           <div className="flex flex-col gap-8">
-            {groups.map(([name, events]) => (
+            {groups.map(([name, grouped]) => (
               <section key={name}>
                 <h3 className="mb-3 text-sm font-medium">{name}</h3>
-                <CardGrid events={events} />
+                <CardGrid days={grouped} />
               </section>
             ))}
           </div>
         )
       ) : (
-        <CardGrid events={view === "calendar" ? monthEvents : visible} />
+        <CardGrid days={view === "calendar" ? monthDays : visibleDays} />
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -299,22 +332,6 @@ export function JournalPage() {
                 placeholder="A short paragraph, optional"
                 onChange={(event) => setNote(event.target.value)}
               />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="entry-tag">Tag</Label>
-              <Input
-                id="entry-tag"
-                value={draftTag}
-                maxLength={40}
-                placeholder="Learning, Personal, …"
-                list="journal-tags"
-                onChange={(event) => setDraftTag(event.target.value)}
-              />
-              <datalist id="journal-tags">
-                {tags.map((name) => (
-                  <option key={name} value={name} />
-                ))}
-              </datalist>
             </div>
           </div>
           <DialogFooter>

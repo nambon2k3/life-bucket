@@ -118,7 +118,7 @@ def log_habit_checkin(habit_id: int) -> str:
     except LookupError as exc:
         return json.dumps({"error": str(exc)})
     invalidate_dashboard()
-    publish_activity("checkin", f"{payload['name']} checked in via coach")
+    publish_activity("checkin", f"{payload['name']} checked in via assistant")
     return json.dumps(payload)
 
 
@@ -131,11 +131,14 @@ def add_task(
     bucket_id: int = 0,
     project_id: int = 0,
 ) -> str:
-    """Create a task. Pass 0 for project_id to file it under General. due_on is YYYY-MM-DD or empty.
+    """Create a task the user already confirmed. project_id must be an id they chose.
 
-    Call this only when the user explicitly asks to add a task.
+    Pass the General project's id only when the user asked for General. due_on is YYYY-MM-DD or empty.
+    If the project is missing, call ask_missing_info with field project and stop. Do not pass 0.
     """
 
+    if project_id <= 0:
+        return json.dumps({"error": "project_id is required. Call ask_missing_info with field project and stop."})
     parsed_due: date | None = None
     if due_on.strip():
         try:
@@ -157,9 +160,32 @@ def add_task(
     except LookupError as exc:
         return json.dumps({"error": str(exc)})
     invalidate_dashboard()
-    publish_activity("task", f"Coach added task {payload['title']}")
+    publish_activity("task", f"Assistant added task {payload['title']}")
     return json.dumps(payload)
+
+
+@tool
+def ask_missing_info(field: str, question: str = "") -> str:
+    """Stop and ask the user before any write. field is project, habit, due_on, priority, or other.
+
+    Project and habit choices come from the database. Do not invent ids or names.
+    After this tool, stop. Do not call add_task or log_habit_checkin in the same turn.
+    """
+
+    kind = field.strip().lower()
+    choices: list[dict] = []
+    if kind in {"project", "project_id"}:
+        kind = "project"
+        choices = [{"id": row["id"], "name": row["name"]} for row in projects_snapshot()]
+    elif kind in {"habit", "habit_id"}:
+        kind = "habit"
+        choices = [{"id": row["id"], "name": row["name"]} for row in habits_snapshot()]
+    text = question.strip() or (
+        "Which project should this use?" if kind == "project" else "Which habit should I check in?" if kind == "habit" else "What is missing?"
+    )
+    return json.dumps({"need_user": True, "field": kind, "question": text, "choices": choices}, ensure_ascii=False)
 
 
 READ_TOOLS = [list_habits_today, list_open_tasks, list_projects]
 WRITE_TOOLS = [log_habit_checkin, add_task]
+CLARIFY_TOOLS = [ask_missing_info]

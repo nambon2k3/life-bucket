@@ -53,13 +53,11 @@ export function JournalDayPage() {
   const [atTime, setAtTime] = useState("")
   const [title, setTitle] = useState("")
   const [note, setNote] = useState("")
-  const [tag, setTag] = useState("")
   const [saving, setSaving] = useState(false)
   const [editing, setEditing] = useState<number | null>(null)
   const [draftTime, setDraftTime] = useState("")
   const [draftTitle, setDraftTitle] = useState("")
   const [draftNote, setDraftNote] = useState("")
-  const [draftTag, setDraftTag] = useState("")
 
   useEffect(() => {
     if (!valid) navigate("/journal", { replace: true })
@@ -86,13 +84,11 @@ export function JournalDayPage() {
           at_time: atTime || null,
           title,
           note,
-          tag,
         }),
       })
       setTitle("")
       setNote("")
       setAtTime("")
-      setTag("")
       await journal.reload()
     } catch (caught) {
       toast.error(caught instanceof Error ? caught.message : "Could not save the event")
@@ -106,7 +102,6 @@ export function JournalDayPage() {
     setDraftTime(clock(event.at_time))
     setDraftTitle(event.title)
     setDraftNote(event.note)
-    setDraftTag(event.tag)
   }
 
   async function saveEdit(event: JournalEvent) {
@@ -117,7 +112,6 @@ export function JournalDayPage() {
           at_time: draftTime || null,
           title: draftTitle,
           note: draftNote,
-          tag: draftTag,
         }),
       })
       setEditing(null)
@@ -169,9 +163,8 @@ export function JournalDayPage() {
           void addEvent()
         }}
       >
-        <div className="grid gap-2 sm:grid-cols-[6.5rem_8rem_1fr]">
+        <div className="grid gap-2 sm:grid-cols-[6.5rem_1fr]">
           <Input type="time" aria-label="Time" value={atTime} onChange={(event) => setAtTime(event.target.value)} />
-          <Input aria-label="Tag" placeholder="Tag" value={tag} maxLength={40} onChange={(event) => setTag(event.target.value)} />
           <Input
             aria-label="What happened"
             placeholder="What happened"
@@ -210,7 +203,6 @@ export function JournalDayPage() {
                   {editing === event.id ? (
                     <div className="grid gap-2">
                       <Input type="time" aria-label="Edit time" value={draftTime} onChange={(input) => setDraftTime(input.target.value)} />
-                      <Input aria-label="Edit tag" placeholder="Tag" value={draftTag} maxLength={40} onChange={(input) => setDraftTag(input.target.value)} />
                       <Input aria-label="Edit event" value={draftTitle} maxLength={140} onChange={(input) => setDraftTitle(input.target.value)} />
                       <Textarea aria-label="Edit note" value={draftNote} maxLength={280} onChange={(input) => setDraftNote(input.target.value)} />
                       <div className="flex gap-2">
@@ -227,7 +219,6 @@ export function JournalDayPage() {
                       <div>
                         <p className="font-medium">{event.title}</p>
                         {event.note ? <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{event.note}</p> : null}
-                        {event.tag ? <p className="mt-2 text-xs text-muted-foreground">{event.tag}</p> : null}
                       </div>
                       <div className="flex shrink-0 gap-1">
                         <Button variant="ghost" size="icon-sm" aria-label={`Edit ${event.title}`} className="cursor-pointer" onClick={() => startEdit(event)}>
