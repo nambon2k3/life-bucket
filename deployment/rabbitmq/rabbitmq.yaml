@@ -1,0 +1,14 @@
+apiVersion: rabbitmq.com/v1beta1
+kind: RabbitmqCluster
+metadata:
+  name: rabbitmq
+  namespace: rabbitmq
+spec:
+  replicas: 1
+  persistence:
+    storage: 5Gi
+    storageClassName: rabbitmq-local
+  rabbitmq:
+    additionalConfig: |
+      default_user = admin
+      default_pass = admin

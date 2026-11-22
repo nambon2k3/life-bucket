@@ -10,7 +10,7 @@ infra:
 	docker compose up -d postgres redis rabbitmq
 
 logs:
-	docker compose logs -f api worker beat
+	docker compose logs -f api worker beat web
 
 test:
 	cd backend && python -m pytest

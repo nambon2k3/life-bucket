@@ -68,23 +68,15 @@ habbit-tracking/
         └── lib/
 ```
 
-API không serve file React. Vite chạy riêng và proxy `/api` sang cổng 8000.
+API không serve file React. Service `web` chạy Vite và proxy `/api` sang `api:8000`.
 
 ## Chạy
 
-Cần Docker, Node 20+, và [Ollama](https://ollama.com) nếu muốn nói chuyện với assistant.
+Cần Docker và [Ollama](https://ollama.com) nếu muốn nói chuyện với assistant.
 
 ```bash
 ollama pull qwen2.5:7b
 docker compose up --build
-```
-
-Terminal khác:
-
-```bash
-cd frontend
-npm install
-npm run dev
 ```
 
 Mở:

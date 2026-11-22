@@ -1,0 +1,204 @@
+{{- if .Values.auth.enabled }}
+{{- /* The first user with an inline password. valkey.hasInlinePasswords also
+       counts the Sentinel password, which gives no user to test with. */}}
+{{- $firstUsername := "" }}
+{{- range $username, $user := .Values.auth.aclUsers }}
+  {{- if $user.password }}
+    {{- if not $firstUsername }}
+      {{- $firstUsername = $username }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- if $firstUsername }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "valkey.fullname" . }}-test-auth-generated
+  labels:
+    {{- include "valkey.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  {{- include "valkey.imagePullSecrets" . | nindent 2 }}
+  automountServiceAccountToken: false
+  securityContext:
+    {{- toYaml .Values.podSecurityContext | nindent 4 }}
+  containers:
+    - name: test-auth
+      image: {{ include "valkey.image" . | quote }}
+      imagePullPolicy: {{ .Values.image.pullPolicy }}
+      {{- with .Values.securityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      command:
+        - sh
+        - -c
+        - |
+          set -e
+          echo "Testing authentication with user {{ $firstUsername }} (inline passwords)..."
+
+          # Extract password from secret
+          PASSWORD=$(cat /valkey-auth/{{ $firstUsername }}-password)
+          USERNAME="{{ $firstUsername }}"
+
+          {{- if .Values.tls.enabled }}
+          # TLS flags
+          TLS_FLAGS="--tls --cacert /tls/{{ .Values.tls.caPublicKey }}{{ if .Values.tls.requireClientCertificate }} --cert /tls/{{ .Values.tls.serverPublicKey }} --key /tls/{{ .Values.tls.serverKey }}{{ end }}"
+          {{- else }}
+          TLS_FLAGS=""
+          {{- end }}
+
+          {{- if and .Values.replica.enabled .Values.sentinel.enabled }}
+          # The valkey service balances across every pod in Sentinel mode, so a
+          # write through it can land on a replica. Ask Sentinel for the master,
+          # through the client service, which routes only to ready Sentinels.
+          # Without it, the headless service also lists Sentinels that are not
+          # ready, and valkey-cli tries only the first address.
+          MASTER=$(REDISCLI_AUTH="$(cat /sentinel-auth/password)" valkey-cli $TLS_FLAGS --user sentinel --raw \
+            {{- if .Values.sentinel.service.enabled }}
+            -h {{ include "valkey.sentinel.fullname" . }} -p {{ .Values.sentinel.service.port }} \
+            {{- else }}
+            -h {{ include "valkey.sentinel.headlessServiceName" . }} -p {{ .Values.sentinel.port }} \
+            {{- end }}
+            SENTINEL get-master-addr-by-name {{ .Values.sentinel.masterSet }} | tr '\n' ' ')
+          set -- $MASTER
+          if [ -z "${1:-}" ] || [ -z "${2:-}" ]; then
+            echo "✗ Sentinel named no master: '$MASTER'"
+            exit 1
+          fi
+          HOST="$1"
+          PORT="$2"
+          echo "Sentinel names $HOST:$PORT as the master"
+          {{- else }}
+          HOST="{{ include "valkey.fullname" . }}"
+          PORT="{{ .Values.service.port }}"
+          {{- end }}
+
+          # Test authentication
+          PING_RESULT=$(valkey-cli -h "$HOST" -p "$PORT" $TLS_FLAGS --user "$USERNAME" --pass "$PASSWORD" --no-auth-warning PING)
+          if [ "$PING_RESULT" != "PONG" ]; then
+            echo "✗ Authentication test failed: expected 'PONG', got '$PING_RESULT'"
+            exit 1
+          fi
+          echo "✓ PING successful: $PING_RESULT"
+
+          # Test that we can set and get a value (if permissions allow).
+          # valkey-cli exits 0 on an error reply too, so check the reply itself.
+          SET_RESULT=$(valkey-cli -h "$HOST" -p "$PORT" $TLS_FLAGS --user "$USERNAME" --pass "$PASSWORD" --no-auth-warning SET test-key-generated "test-value" || true)
+          case "$SET_RESULT" in
+            OK)
+              VALUE=$(valkey-cli -h "$HOST" -p "$PORT" $TLS_FLAGS --user "$USERNAME" --pass "$PASSWORD" --no-auth-warning GET test-key-generated)
+              if [ "$VALUE" = "test-value" ]; then
+                echo "✓ Authentication test passed with write permissions"
+                exit 0
+              fi
+              echo "✗ Authentication test failed: expected 'test-value', got '$VALUE'"
+              exit 1
+              ;;
+            *NOPERM*)
+              echo "✓ Authentication test passed (read-only or restricted permissions)"
+              exit 0
+              ;;
+            *)
+              echo "✗ SET failed: $SET_RESULT"
+              exit 1
+              ;;
+          esac
+      volumeMounts:
+        - name: valkey-auth
+          mountPath: /valkey-auth
+          readOnly: true
+        {{- if and .Values.replica.enabled .Values.sentinel.enabled }}
+        - name: sentinel-auth
+          mountPath: /sentinel-auth
+          readOnly: true
+        {{- end }}
+        {{- if .Values.tls.enabled }}
+        - name: valkey-tls
+          mountPath: /tls
+          readOnly: true
+        {{- end }}
+  volumes:
+    - name: valkey-auth
+      secret:
+        secretName: {{ include "valkey.fullname" . }}-auth
+    {{- if and .Values.replica.enabled .Values.sentinel.enabled }}
+    {{- include "valkey.sentinel.authVolume" . | nindent 4 }}
+    {{- end }}
+    {{- if .Values.tls.enabled }}
+    - name: valkey-tls
+      {{- include "valkey.tls.volumeSource" . | nindent 6 }}
+    {{- end }}
+{{- end }}
+{{- end }}
+{{- if and .Values.auth.enabled .Values.auth.usersExistingSecret }}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "valkey.fullname" . }}-test-auth-existing
+  labels:
+    {{- include "valkey.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  {{- include "valkey.imagePullSecrets" . | nindent 2 }}
+  automountServiceAccountToken: false
+  securityContext:
+    {{- toYaml .Values.podSecurityContext | nindent 4 }}
+  containers:
+    - name: test-auth
+      image: {{ include "valkey.image" . | quote }}
+      imagePullPolicy: {{ .Values.image.pullPolicy }}
+      {{- with .Values.securityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      command:
+        - sh
+        - -c
+        - |
+          set -e
+          echo "Testing authentication with usersExistingSecret..."
+
+          {{- if .Values.tls.enabled }}
+          # TLS flags
+          TLS_FLAGS="--tls --cacert /tls/{{ .Values.tls.caPublicKey }}{{ if .Values.tls.requireClientCertificate }} --cert /tls/{{ .Values.tls.serverPublicKey }} --key /tls/{{ .Values.tls.serverKey }}{{ end }}"
+          {{- else }}
+          TLS_FLAGS=""
+          {{- end }}
+
+          # Test basic connection (no auth - will fail if auth is properly configured)
+          PING_RESULT=$(valkey-cli -h {{ include "valkey.fullname" . }} -p {{ .Values.service.port }} $TLS_FLAGS PING 2>&1 || true)
+          if [ "$PING_RESULT" = "PONG" ]; then
+            echo "✗ Authentication test failed: server allows unauthenticated access"
+            exit 1
+          fi
+
+          echo "✓ Authentication is enforced (unauthenticated access denied)"
+          echo "✓ Received expected error: $PING_RESULT"
+          echo "⚠ Manual verification recommended for usersExistingSecret configuration"
+          exit 0
+      volumeMounts:
+        - name: valkey-users-secret
+          mountPath: /valkey-users-secret
+          readOnly: true
+        {{- if .Values.tls.enabled }}
+        - name: valkey-tls
+          mountPath: /tls
+          readOnly: true
+        {{- end }}
+  volumes:
+    - name: valkey-users-secret
+      secret:
+        secretName: {{ tpl .Values.auth.usersExistingSecret . }}
+    {{- if .Values.tls.enabled }}
+    - name: valkey-tls
+      {{- include "valkey.tls.volumeSource" . | nindent 6 }}
+    {{- end }}
+{{- end }}

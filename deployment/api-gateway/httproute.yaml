@@ -1,0 +1,36 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: life-bucket
+  namespace: life-bucket
+spec:
+  parentRefs:
+    - name: kong
+      namespace: kong
+      sectionName: http
+  hostnames:
+    - life-bucket.local
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api
+        - path:
+            type: PathPrefix
+            value: /docs
+        - path:
+            type: PathPrefix
+            value: /redoc
+        - path:
+            type: Exact
+            value: /openapi.json
+      backendRefs:
+        - name: backend
+          port: 8000
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: frontend
+          port: 5173

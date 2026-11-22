@@ -1,0 +1,146 @@
+# Chart này chỉ deploy API, worker và beat.
+# Postgres và Valkey cài riêng trong namespace life-bucket.
+# RabbitMQ vẫn để bạn tự cài.
+
+replicaCount: 1
+
+image:
+  repository: life-bucket-backend
+  pullPolicy: IfNotPresent
+  tag: latest
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+service:
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+
+httpRoute:
+  enabled: false
+  annotations: {}
+  parentRefs:
+    - name: gateway
+      sectionName: http
+  hostnames:
+    - chart-example.local
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+
+resources: {}
+
+startupProbe:
+  httpGet:
+    path: /
+    port: http
+  periodSeconds: 5
+  failureThreshold: 18
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+  periodSeconds: 20
+
+readinessProbe:
+  httpGet:
+    path: /api/v1/health
+    port: http
+  periodSeconds: 10
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+
+volumes: []
+volumeMounts: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Để trống để chart tạo Secret. Điền tên Secret có sẵn nếu không muốn mật khẩu nằm trong values.
+# Secret đó cần các key: DATABASE_URL, REDIS_URL, CELERY_BROKER_URL, CELERY_RESULT_BACKEND,
+# OLLAMA_BASE_URL, OLLAMA_MODEL, CORS_ORIGINS.
+env:
+  existingSecret: ""
+
+postgres:
+  host: postgresql
+  port: 5432
+  user: admin
+  password: admin
+  database: life-bucket
+
+redis:
+  host: valkey
+  port: 6379
+  password: admin
+  cacheDb: 0
+  resultDb: 1
+
+rabbitmq:
+  host: rabbitmq.rabbitmq.svc.cluster.local
+  port: 5672
+  user: admin
+  password: admin
+  vhost: /
+
+ollama:
+  baseUrl: http://ollama:11434
+  model: qwen2.5:7b
+
+corsOrigins: http://localhost:5173
+
+worker:
+  enabled: true
+  replicaCount: 1
+  command:
+    - celery
+    - -A
+    - app.workers.celery_app
+    - worker
+    - -Q
+    - celery,habits,reminders,agent
+    - --loglevel=info
+  resources: {}
+
+beat:
+  enabled: true
+  command:
+    - celery
+    - -A
+    - app.workers.celery_app
+    - beat
+    - --loglevel=info
+  resources: {}

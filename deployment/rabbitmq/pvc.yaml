@@ -1,0 +1,19 @@
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: rabbitmq-pv
+spec:
+  capacity:
+    storage: 5Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: rabbitmq-local
+  hostPath:
+    path: /home/nvhnam/data/life-bucket/rabbitmq
+    type: Directory
+  claimRef:
+    namespace: rabbitmq
+    name: persistence-rabbitmq-server-0
