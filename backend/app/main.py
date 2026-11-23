@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
+from app.mcp.server import mcp
 from app.core.cache import invalidate_dashboard
 from app.core.config import get_settings
 from app.core.database import (
@@ -36,7 +37,8 @@ async def lifespan(_app: FastAPI):
     ensure_task_project_required()
     invalidate_dashboard()
     logger.info("Life Buckets API is ready")
-    yield
+    async with mcp.session_manager.run():
+        yield
 
 
 def create_app() -> FastAPI:
@@ -50,6 +52,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(api_router, prefix="/api/v1")
+    app.mount("/mcp", mcp.streamable_http_app())
 
     @app.get("/")
     def root() -> dict[str, str]:
