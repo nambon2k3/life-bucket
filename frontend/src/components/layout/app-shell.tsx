@@ -1,4 +1,4 @@
-import { BookOpen, Flame, FolderKanban, Inbox, LayoutGrid, Server, Sparkles } from "lucide-react"
+import { BookOpen, Flame, FolderKanban, Inbox, LayoutGrid, Server } from "lucide-react"
 import { NavLink, Outlet } from "react-router-dom"
 
 import { cn } from "@/lib/utils"
@@ -9,7 +9,6 @@ const links = [
   { to: "/projects", label: "Projects", icon: FolderKanban, end: false },
   { to: "/inbox", label: "Task Inbox", icon: Inbox, end: false },
   { to: "/journal", label: "Journal", icon: BookOpen, end: false },
-  { to: "/coach", label: "Assistant", icon: Sparkles, end: false },
   { to: "/system", label: "System", icon: Server, end: false },
 ]
 

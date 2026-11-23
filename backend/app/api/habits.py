@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -9,7 +9,7 @@ from app.core.database import get_db
 from app.models import Habit
 from app.schemas.habit import HabitCreate, HabitOut
 from app.services.bus import publish_activity
-from app.services.catalog import create_habit, record_checkin, remove_checkin
+from app.services.catalog import create_habit, delete_habit, record_checkin, remove_checkin
 from app.services.serialize import to_habit
 
 router = APIRouter()
@@ -48,6 +48,18 @@ def post_habit(payload: HabitCreate, db: Session = Depends(get_db)) -> HabitOut:
     invalidate_dashboard()
     publish_activity("habit", f"Added habit {habit.name}")
     return to_habit(_load(db, habit.id), date.today())
+
+
+@router.delete("/{habit_id}", status_code=204)
+def remove_habit(habit_id: int, db: Session = Depends(get_db)) -> Response:
+    try:
+        name = delete_habit(db, habit_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    db.commit()
+    invalidate_dashboard()
+    publish_activity("habit", f"Removed habit {name}")
+    return Response(status_code=204)
 
 
 @router.post("/{habit_id}/checkins", response_model=HabitOut)

@@ -113,7 +113,7 @@ export function ProjectsPage() {
       </div>
       <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {visible.map((project) => (
-          <ProjectCard key={project.id} project={project} />
+          <ProjectCard key={project.id} project={project} onDeleted={() => void projects.reload()} />
         ))}
       </div>
       {visible.length === 0 && !projects.loading ? (

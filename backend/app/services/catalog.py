@@ -165,6 +165,47 @@ def assign_orphan_tasks(db: Session) -> None:
         db.flush()
 
 
+def delete_habit(db: Session, habit_id: int) -> str:
+    """Remove one habit and the check-ins stored with it.
+
+    Input:
+        db (Session): the request session.
+        habit_id (int): the habit to remove.
+
+    Output:
+        str: the habit name, for the activity log.
+        LookupError: when that id is not stored.
+    """
+    habit = db.get(Habit, habit_id)
+    if habit is None:
+        raise LookupError(f"Habit {habit_id} was not found")
+    name = habit.name
+    db.delete(habit)
+    return name
+
+
+def delete_project(db: Session, project_id: int) -> str:
+    """Remove one project and the tasks that belong to it.
+
+    Input:
+        db (Session): the request session.
+        project_id (int): the project to remove.
+
+    Output:
+        str: the project name, for the activity log.
+        LookupError: when that id is not stored.
+    """
+    project = db.get(Project, project_id)
+    if project is None:
+        raise LookupError(f"Project {project_id} was not found")
+    name = project.name
+    for task in db.scalars(select(Task).where(Task.project_id == project.id)).all():
+        db.delete(task)
+    db.flush()
+    db.delete(project)
+    return name
+
+
 def delete_bucket(db: Session, bucket_id: int) -> str:
     bucket = db.get(Bucket, bucket_id)
     if bucket is None:

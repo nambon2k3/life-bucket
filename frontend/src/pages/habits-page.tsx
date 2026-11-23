@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useSearchParams } from "react-router-dom"
+import { Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { HabitHeatmap } from "@/components/habit-heatmap"
@@ -10,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -32,6 +34,8 @@ export function HabitsPage() {
   const [frequency, setFrequency] = useState("daily")
   const [bucketId, setBucketId] = useState(params.get("bucket") ?? "")
   const [saving, setSaving] = useState(false)
+  const [pending, setPending] = useState<Habit | null>(null)
+  const [removing, setRemoving] = useState(false)
 
   async function toggle(habit: Habit) {
     try {
@@ -43,6 +47,20 @@ export function HabitsPage() {
       await habits.reload()
     } catch (caught) {
       toast.error(caught instanceof Error ? caught.message : "Could not update the habit")
+    }
+  }
+
+  async function removeHabit() {
+    if (!pending) return
+    setRemoving(true)
+    try {
+      await api(`/api/v1/habits/${pending.id}`, { method: "DELETE" })
+      setPending(null)
+      await habits.reload()
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : "Could not delete the habit")
+    } finally {
+      setRemoving(false)
     }
   }
 
@@ -99,13 +117,23 @@ export function HabitsPage() {
                   <CardHeader className="px-4">
                     <CardTitle className="flex items-center justify-between gap-3 text-base">
                       <span>{habit.name}</span>
-                      <Button
-                        size="sm"
-                        variant={habit.done_today ? "secondary" : "default"}
-                        onClick={() => void toggle(habit)}
-                      >
-                        {habit.done_today ? "Done today" : "Check in"}
-                      </Button>
+                      <span className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Delete ${habit.name}`}
+                          onClick={() => setPending(habit)}
+                        >
+                          <Trash2 />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={habit.done_today ? "secondary" : "default"}
+                          onClick={() => void toggle(habit)}
+                        >
+                          {habit.done_today ? "Done today" : "Check in"}
+                        </Button>
+                      </span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3 px-4 text-sm text-muted-foreground">
@@ -124,6 +152,23 @@ export function HabitsPage() {
           </section>
         ))}
       </div>
+
+      <Dialog open={pending !== null} onOpenChange={(next) => { if (!next) setPending(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {pending?.name}?</DialogTitle>
+            <DialogDescription>This habit and its check-ins are removed.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPending(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" disabled={removing} onClick={() => void removeHabit()}>
+              Delete habit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={open} onOpenChange={(next) => setParams(next ? { new: "1" } : {})}>
         <DialogContent>

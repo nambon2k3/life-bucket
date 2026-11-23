@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -7,7 +7,7 @@ from app.core.database import get_db
 from app.models import Bucket, Project, Task
 from app.schemas.project import ProjectCreate, ProjectOut, ProjectUpdate
 from app.services.bus import publish_activity
-from app.services.catalog import create_project
+from app.services.catalog import create_project, delete_project
 from app.services.serialize import to_project
 
 router = APIRouter()
@@ -56,6 +56,18 @@ def post_project(payload: ProjectCreate, db: Session = Depends(get_db)) -> Proje
     invalidate_dashboard()
     publish_activity("project", f"Added project {project.name}")
     return to_project(_load(db, project.id))
+
+
+@router.delete("/{project_id}", status_code=204)
+def remove_project(project_id: int, db: Session = Depends(get_db)) -> Response:
+    try:
+        name = delete_project(db, project_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    db.commit()
+    invalidate_dashboard()
+    publish_activity("project", f"Removed project {name}")
+    return Response(status_code=204)
 
 
 @router.patch("/{project_id}", response_model=ProjectOut)

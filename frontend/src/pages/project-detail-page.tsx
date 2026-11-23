@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react"
-import { ChevronLeft, Folder, ImageIcon, CalendarRange } from "lucide-react"
+import { ChevronLeft, Folder, ImageIcon, CalendarRange, Trash2 } from "lucide-react"
 import { useNavigate, useParams } from "react-router-dom"
 import { toast } from "sonner"
 
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -49,6 +50,10 @@ export function ProjectDetailPage() {
   const [dueOn, setDueOn] = useState("")
   const [priority, setPriority] = useState("medium")
   const [saving, setSaving] = useState(false)
+  const [pendingTask, setPendingTask] = useState<Task | null>(null)
+  const [removingTask, setRemovingTask] = useState(false)
+  const [confirmProject, setConfirmProject] = useState(false)
+  const [removingProject, setRemovingProject] = useState(false)
 
   useEffect(() => {
     if (project.data) setBucketId(String(project.data.bucket_id))
@@ -83,6 +88,32 @@ export function ProjectDetailPage() {
       await Promise.all([tasks.reload(), project.reload()])
     } catch (caught) {
       toast.error(caught instanceof Error ? caught.message : "Could not update the task")
+    }
+  }
+
+  async function removeTask() {
+    if (!pendingTask) return
+    setRemovingTask(true)
+    try {
+      await api(`/api/v1/tasks/${pendingTask.id}`, { method: "DELETE" })
+      setPendingTask(null)
+      await Promise.all([tasks.reload(), project.reload()])
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : "Could not delete the task")
+    } finally {
+      setRemovingTask(false)
+    }
+  }
+
+  async function removeProject() {
+    if (!project.data) return
+    setRemovingProject(true)
+    try {
+      await api(`/api/v1/projects/${project.data.id}`, { method: "DELETE" })
+      navigate("/projects")
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : "Could not delete the project")
+      setRemovingProject(false)
     }
   }
 
@@ -128,6 +159,15 @@ export function ProjectDetailPage() {
           <ChevronLeft />
         </Button>
         <h1 className="text-3xl font-semibold tracking-tight">{current.name}</h1>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="ml-auto"
+          aria-label={`Delete ${current.name}`}
+          onClick={() => setConfirmProject(true)}
+        >
+          <Trash2 />
+        </Button>
       </div>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -204,8 +244,46 @@ export function ProjectDetailPage() {
           See your related tasks within a project, organized by priority, due date, and status.
         </p>
         <h3 className="mt-4 mb-2 text-sm">Related tasks</h3>
-        <TaskTable tasks={related} onToggle={(task) => void toggle(task)} />
+        <TaskTable
+          tasks={related}
+          onToggle={(task) => void toggle(task)}
+          onDelete={(task) => setPendingTask(task)}
+        />
       </section>
+
+      <Dialog open={pendingTask !== null} onOpenChange={(next) => { if (!next) setPendingTask(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {pendingTask?.title}?</DialogTitle>
+            <DialogDescription>This task is removed from the project.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingTask(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" disabled={removingTask} onClick={() => void removeTask()}>
+              Delete task
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={confirmProject} onOpenChange={setConfirmProject}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {current.name}?</DialogTitle>
+            <DialogDescription>Tasks in this project are deleted with it.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmProject(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" disabled={removingProject} onClick={() => void removeProject()}>
+              Delete project
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

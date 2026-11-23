@@ -1,4 +1,7 @@
+import { Trash2 } from "lucide-react"
+
 import { StatusBadge } from "@/components/status-badge"
+import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { formatDate, isOverdue } from "@/lib/format"
 import type { Task } from "@/lib/types"
@@ -8,11 +11,13 @@ export function TaskTable({
   selectedIds,
   onSelect,
   onToggle,
+  onDelete,
 }: {
   tasks: Task[]
   selectedIds?: ReadonlySet<number>
   onSelect?: (task: Task, checked: boolean) => void
   onToggle?: (task: Task) => void
+  onDelete?: (task: Task) => void
 }) {
   if (tasks.length === 0) {
     return <p className="text-sm text-muted-foreground">Nothing in this view.</p>
@@ -31,6 +36,7 @@ export function TaskTable({
           <TableHead>Project</TableHead>
           <TableHead>Bucket</TableHead>
           <TableHead>Description</TableHead>
+          {onDelete ? <TableHead className="w-12" /> : null}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -62,6 +68,18 @@ export function TaskTable({
             <TableCell>{task.project_name ?? "—"}</TableCell>
             <TableCell>{task.bucket_name ?? "—"}</TableCell>
             <TableCell className="max-w-48 text-muted-foreground">{task.notes || "—"}</TableCell>
+            {onDelete ? (
+              <TableCell>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Delete ${task.title}`}
+                  onClick={() => onDelete(task)}
+                >
+                  <Trash2 />
+                </Button>
+              </TableCell>
+            ) : null}
           </TableRow>
           )
         })}

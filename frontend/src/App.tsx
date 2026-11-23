@@ -1,7 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom"
 
 import { AppShell } from "@/components/layout/app-shell"
-import { CoachPage } from "@/pages/coach-page"
 import { DashboardPage } from "@/pages/dashboard-page"
 import { HabitsPage } from "@/pages/habits-page"
 import { JournalDayPage } from "@/pages/journal-day-page"
@@ -22,7 +21,6 @@ export default function App() {
         <Route path="inbox" element={<InboxPage />} />
         <Route path="journal/:day" element={<JournalDayPage />} />
         <Route path="journal" element={<JournalPage />} />
-        <Route path="coach" element={<CoachPage />} />
         <Route path="system" element={<SystemPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

@@ -62,7 +62,7 @@ export function DashboardPage() {
             <TabsTrigger value="completed">Completed</TabsTrigger>
           </TabsList>
         </Tabs>
-        <ProjectGrid projects={projects} />
+        <ProjectGrid projects={projects} onDeleted={() => void reload()} />
       </section>
 
       <section>
@@ -81,14 +81,14 @@ export function DashboardPage() {
   )
 }
 
-function ProjectGrid({ projects }: { projects: Project[] }) {
+function ProjectGrid({ projects, onDeleted }: { projects: Project[]; onDeleted: () => void }) {
   if (projects.length === 0) {
     return <p className="mt-4 text-sm text-muted-foreground">No projects in this view.</p>
   }
   return (
     <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {projects.map((project) => (
-        <ProjectCard key={project.id} project={project} />
+        <ProjectCard key={project.id} project={project} onDeleted={onDeleted} />
       ))}
     </div>
   )
