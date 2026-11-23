@@ -90,12 +90,13 @@ def _runner(tool: Any) -> Runner:
 
 
 def build_mcp() -> FastMCP:
-    """Register habit, task, and project tools on a stateless HTTP MCP server."""
+    """Register habit, task, project, bucket, and journal tools on a stateless HTTP MCP server."""
     server = FastMCP(
         "life-bucket",
         instructions=(
-            "Tools for habits, tasks, and projects. Look up ids before a write. "
-            "If the project or habit is not explicit, call ask_missing_info and stop."
+            "Tools for habits, tasks, projects, life buckets, and the journal. "
+            "Look up ids before a write. If the project, habit, or bucket is not explicit, "
+            "call ask_missing_info and stop."
         ),
         host="0.0.0.0",
         streamable_http_path="/",
